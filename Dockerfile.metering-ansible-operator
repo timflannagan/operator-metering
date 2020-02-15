@@ -3,7 +3,6 @@ FROM quay.io/openshift/origin-metering-helm:latest as helm
 # final image needs kubectl, so we copy `oc` from cli image to use as kubectl.
 FROM openshift/origin-cli:latest as cli
 # the base image is the ansible-operator's origin images
-# TODO: stop using the latest tag for base images
 FROM quay.io/openshift/origin-ansible-operator:4.5
 
 USER root
