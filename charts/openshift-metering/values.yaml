@@ -720,7 +720,7 @@ hive:
 
       sharedVolume:
         enabled: false
-        mountPath: /user/hive/warehouse
+        mountPath: /var/presto-hive
 
         createPVC: false
         claimName: hive-warehouse-data
