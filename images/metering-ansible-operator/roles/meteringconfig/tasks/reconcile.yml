@@ -23,7 +23,7 @@
     - reconcile_metering.yml
     - reconcile_monitoring.yml
     - reconcile_hdfs.yml
-    - reconcile_hive.yml
+    # - reconcile_hive.yml
     - reconcile_presto.yml
     - reconcile_reporting_operator.yml
     - reconcile_reporting.yml
