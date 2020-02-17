@@ -10,7 +10,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	metering "github.com/kube-reporting/metering-operator/pkg/apis/metering/v1"
-	"github.com/kube-reporting/metering-operator/pkg/hive"
+	// "github.com/kube-reporting/metering-operator/pkg/hive"
 	"github.com/kube-reporting/metering-operator/pkg/operator/reportingutil"
 	"github.com/kube-reporting/metering-operator/pkg/util/slice"
 )
@@ -99,18 +99,30 @@ func (op *Reporting) handleStorageLocation(logger log.FieldLogger, storageLocati
 				return fmt.Errorf("spec.hive.databaseName %s is invalid, must contain only alpha numeric values, underscores, and start with a letter or underscore", storageLocation.Spec.Hive.DatabaseName)
 			}
 			if storageLocation.Status.Hive.DatabaseName == "" {
-				logger.Infof("creating database %s for StorageLocation %s", storageLocation.Spec.Hive.DatabaseName, storageLocation.Name)
-				err := op.hiveDatabaseManager.CreateDatabase(hive.DatabaseParameters{
-					Name:     storageLocation.Spec.Hive.DatabaseName,
-					Location: storageLocation.Spec.Hive.Location,
-				})
+				catalog := "hive"
+				schema := "metering"
+
+				err := op.prestoTableManager.CreateSchema(catalog, schema)
 				if err != nil {
-					return fmt.Errorf("error creating database %s: %s", storageLocation.Spec.Hive.DatabaseName, err)
+					return fmt.Errorf("failed to create the %s.%s schema: %v", catalog, schema, err)
 				}
-				logger.Infof("successfully created database %s", storageLocation.Spec.Hive.DatabaseName)
+				logger.Infof("Created the %s.%s Presto schema", catalog, schema)
 				storageLocation.Status.Hive.DatabaseName = storageLocation.Spec.Hive.DatabaseName
-				storageLocation.Status.Hive.Location = storageLocation.Spec.Hive.Location
+				storageLocation.Status.Hive.Location = fmt.Sprintf("%s.%s", catalog, schema)
 				needsUpdate = true
+
+				// logger.Infof("creating database %s for StorageLocation %s", storageLocation.Spec.Hive.DatabaseName, storageLocation.Name)
+				// err := op.hiveDatabaseManager.CreateDatabase(hive.DatabaseParameters{
+				// 	Name:     storageLocation.Spec.Hive.DatabaseName,
+				// 	Location: storageLocation.Spec.Hive.Location,
+				// })
+				// if err != nil {
+				// 	return fmt.Errorf("error creating database %s: %s", storageLocation.Spec.Hive.DatabaseName, err)
+				// }
+				// logger.Infof("successfully created database %s", storageLocation.Spec.Hive.DatabaseName)
+				// storageLocation.Status.Hive.DatabaseName = storageLocation.Spec.Hive.DatabaseName
+				// storageLocation.Status.Hive.Location = storageLocation.Spec.Hive.Location
+				// needsUpdate = true
 			}
 		}
 
