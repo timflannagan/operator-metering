@@ -7,32 +7,8 @@ hive.compression-codec=SNAPPY
 hive.hdfs.authentication.type=NONE
 hive.metastore.authentication.type=NONE
 hive.collect-column-statistics-on-write=true
-
-{{- if .Values.presto.spec.config.connectors.hive.metastoreURI }}
-hive.metastore.uri={{ .Values.presto.spec.config.connectors.hive.metastoreURI }}
-{{- else if .Values.presto.spec.config.connectors.hive.tls.enabled }}
-hive.metastore.uri=thrift://localhost:9083
-{{- else }}
-hive.metastore.uri=thrift://hive-metastore:9083
-{{- end }}
-{{- if .Values.presto.spec.config.connectors.hive.metastoreTimeout }}
-hive.metastore-timeout={{ .Values.presto.spec.config.connectors.hive.metastoreTimeout }}
-{{- end }}
-{{- if .Values.presto.spec.config.connectors.hive.s3.useInstanceCredentials }}
-hive.s3.use-instance-credentials={{ .Values.presto.spec.config.connectors.hive.s3.useInstanceCredentials }}
-{{- end }}
-{{- if .Values.presto.spec.config.connectors.hive.useHadoopConfig}}
-hive.config.resources=/hadoop-config/core-site.xml
-{{- end }}
-
-{{- if and .Values.presto.spec.config.aws.region .Values.useIPV6Networking }}
-hive.s3.endpoint=https://s3.dualstack.{{ .Values.presto.spec.config.aws.region }}.amazonaws.com
-hive.s3.path-style-access=true
-{{- end }}
-{{- if .Values.presto.spec.config.s3Compatible.endpoint }}
-hive.s3.endpoint={{ .Values.presto.spec.config.s3Compatible.endpoint }}
-hive.s3.path-style-access=true
-{{- end }}
+hive.metastore=file
+hive.metastore.catalog.dir=/var/presto-hive/
 {{- end }}
 
 {{- define "presto-jmx-catalog-properties" -}}
