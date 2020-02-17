@@ -92,6 +92,10 @@ openshift-reporting:
       base:
         enabled: true
         items:
+          - name: prometheus-connector-cpu-cores-limits
+            spec:
+              linkExistingTable:
+                tableName: prometheus.default.kube_pod_container_resource_limits_cpu_cores
           # views
           # - name: cluster-cpu-capacity-raw
           #   spec:
