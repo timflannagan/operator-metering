@@ -204,6 +204,8 @@ spec:
           mountPath: /var/presto/data
         - name: presto-logs
           mountPath: /var/presto/logs
+        - name: presto-metastore
+          mountPath: /var/presto-hive
 {{- if .Values.presto.spec.config.connectors.hive.useHadoopConfig }}
         - name: hadoop-config
           mountPath: /hadoop-config
@@ -271,6 +273,8 @@ spec:
       - name: presto-data
         emptyDir: {}
       - name: presto-logs
+        emptyDir: {}
+      - name: presto-metastore
         emptyDir: {}
 {{- if .Values.presto.spec.config.connectors.hive.useHadoopConfig }}
       - name: hadoop-config
