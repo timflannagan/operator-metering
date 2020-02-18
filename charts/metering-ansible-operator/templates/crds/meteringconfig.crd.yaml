@@ -575,6 +575,23 @@ spec:
                     defaultReportDataSources:
                       type: object
                       properties:
+                        usePrometheusDataSources:
+                          type: object
+                          properties:
+                            enabled:
+                              type: boolean
+                            items:
+                              type: object
+                              required:
+                              - name
+                              - spec
+                              properties:
+                                name:
+                                  type: string
+                                  minLength: 1
+                                spec:
+                                  type: string
+                                  minLength: 1
                         base:
                           type: object
                           properties:

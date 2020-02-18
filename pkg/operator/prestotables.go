@@ -273,7 +273,7 @@ func (op *Reporting) dropPrestoTable(prestoTable *metering.PrestoTable) error {
 	return errors.New("dropping PrestoTables is currently unsupported")
 }
 
-func (op *Reporting) createPrestoTableCR(obj metav1.Object, gvk schema.GroupVersionKind, catalog, schema, tableName string, columns []presto.Column, unmanaged, view bool, query string) (*metering.PrestoTable, error) {
+func (op *Reporting) createPrestoTableCR(obj metav1.Object, gvk schema.GroupVersionKind, catalog, schema, tableName string, columns []presto.Column, unmanaged, view, createTable bool, query string) (*metering.PrestoTable, error) {
 	apiVersion := gvk.GroupVersion().String()
 	kind := gvk.Kind
 	name := obj.GetName()
@@ -302,13 +302,14 @@ func (op *Reporting) createPrestoTableCR(obj metav1.Object, gvk schema.GroupVers
 			Finalizers: finalizers,
 		},
 		Spec: metering.PrestoTableSpec{
-			Unmanaged: unmanaged,
-			Catalog:   catalog,
-			Schema:    schema,
-			TableName: tableName,
-			Columns:   columns,
-			View:      view,
-			Query:     query,
+			Unmanaged:   unmanaged,
+			Catalog:     catalog,
+			Schema:      schema,
+			TableName:   tableName,
+			Columns:     columns,
+			View:        view,
+			Query:       query,
+			CreateTable: createTable,
 		},
 	}
 	var err error

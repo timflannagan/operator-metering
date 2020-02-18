@@ -89,18 +89,21 @@ openshift-reporting:
       enabled: false
 
     defaultReportDataSources:
-      base:
-        enabled: true
+      usePrometheusDataSources:
+        enabled: false
         items:
           - name: prometheus-connector-cpu-cores-limits
             spec:
               linkExistingTable:
                 tableName: prometheus.default.kube_pod_container_resource_limits_cpu_cores
+      base:
+        enabled: true
+        items:
           # views
-          # - name: cluster-cpu-capacity-raw
-          #   spec:
-          #     reportQueryView:
-          #       queryName: cluster-cpu-capacity-raw
+          - name: cluster-cpu-capacity-raw
+            spec:
+              reportQueryView:
+                queryName: cluster-cpu-capacity-raw
           # - name: cluster-cpu-usage-raw
           #   spec:
           #     reportQueryView:

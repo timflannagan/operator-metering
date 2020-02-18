@@ -18,6 +18,8 @@
 - name: Store MeteringConfig spec into values file
   copy: content="{{ meteringconfig_spec }}" dest=/tmp/metering-values.yaml
 
+# TODO: reconcile Hive/HDFS when the default ReportDataSources are used
+# Note: hadoop-config is used by Presto
 - include_tasks: "{{ item }}"
   loop:
     - reconcile_metering.yml

@@ -18,7 +18,7 @@ import (
 
 	metering "github.com/kube-reporting/metering-operator/pkg/apis/metering/v1"
 	meteringUtil "github.com/kube-reporting/metering-operator/pkg/apis/metering/v1/util"
-	"github.com/kube-reporting/metering-operator/pkg/hive"
+	// "github.com/kube-reporting/metering-operator/pkg/hive"
 	"github.com/kube-reporting/metering-operator/pkg/operator/reporting"
 	"github.com/kube-reporting/metering-operator/pkg/operator/reportingutil"
 	"github.com/kube-reporting/metering-operator/pkg/util/slice"
@@ -395,44 +395,27 @@ func (op *Reporting) runReport(logger log.FieldLogger, report *metering.Report) 
 		}
 		if hiveStorage.Status.Hive.DatabaseName == "" {
 			op.enqueueStorageLocation(hiveStorage)
-			return fmt.Errorf("StorageLocation %s Hive database %s does not exist yet", hiveStorage.Name, hiveStorage.Spec.Hive.DatabaseName)
+			return fmt.Errorf("failed to get %s StorageLocation Hive database: %s does not exist yet", hiveStorage.Name, hiveStorage.Spec.Hive.DatabaseName)
 		}
 
-		cols, err := reportingutil.PrestoColumnsToHiveColumns(reportingutil.GeneratePrestoColumns(reportQuery))
+		catalog := "hive"
+		schema := hiveStorage.Status.Hive.DatabaseName
+		cols := reportingutil.GeneratePrestoColumns(reportQuery)
+
+		prestoTable, err := op.createPrestoTableCR(report, metering.ReportGVK, catalog, schema, tableName, cols, false, false, true, "")
 		if err != nil {
-			return fmt.Errorf("unable to convert Presto columns to Hive columns: %s", err)
+			return fmt.Errorf("failed to create a PrestoTable for the %s Report: %v", report.Name, err)
 		}
-
-		params := hive.TableParameters{
-			Database: hiveStorage.Status.Hive.DatabaseName,
-			Name:     tableName,
-			Columns:  cols,
-		}
-		if hiveStorage.Spec.Hive.DefaultTableProperties != nil {
-			params.RowFormat = hiveStorage.Spec.Hive.DefaultTableProperties.RowFormat
-			params.FileFormat = hiveStorage.Spec.Hive.DefaultTableProperties.FileFormat
-		}
-
-		logger.Infof("creating Hive table %s in database %s", tableName, hiveStorage.Status.Hive.DatabaseName)
-		hiveTable, err := op.createHiveTableCR(report, metering.ReportGVK, params, false, nil)
+		prestoTable, err = op.waitForPrestoTable(prestoTable.Namespace, prestoTable.Name, time.Second, 20*time.Second)
 		if err != nil {
-			return fmt.Errorf("error creating table for Report %s: %s", report.Name, err)
+			return fmt.Errorf("error creating table for Report %s: %v", report.Name, err)
 		}
-		hiveTable, err = op.waitForHiveTable(hiveTable.Namespace, hiveTable.Name, time.Second, 20*time.Second)
-		if err != nil {
-			return fmt.Errorf("error creating table for Report %s: %s", report.Name, err)
-		}
-		prestoTable, err = op.waitForPrestoTable(hiveTable.Namespace, hiveTable.Name, time.Second, 20*time.Second)
-		if err != nil {
-			return fmt.Errorf("error creating table for Report %s: %s", report.Name, err)
-		}
-
-		logger.Infof("created Hive table %s in database %s", tableName, hiveStorage.Status.Hive.DatabaseName)
-
 		tableName, err = reportingutil.FullyQualifiedTableName(prestoTable)
 		if err != nil {
 			return err
 		}
+		logger.Infof("Created the %s Presto table", tableName)
+
 		dataSourceName := fmt.Sprintf("report-%s", report.Name)
 
 		logger.Infof("creating PrestoTable ReportDataSource %s pointing at report table %s", dataSourceName, tableName)
@@ -468,7 +451,7 @@ func (op *Reporting) runReport(logger log.FieldLogger, report *metering.Report) 
 		}
 		logger.Infof("created PrestoTable ReportDataSource %s", dataSourceName)
 
-		report.Status.TableRef = v1.LocalObjectReference{Name: hiveTable.Name}
+		report.Status.TableRef = v1.LocalObjectReference{Name: prestoTable.Name}
 		report, err = op.meteringClient.MeteringV1().Reports(report.Namespace).Update(report)
 		if err != nil {
 			logger.WithError(err).Errorf("unable to update Report status with tableName")

@@ -303,8 +303,9 @@ type OpenshiftReportingAWSBillingReportDataSourceConfig struct {
 	Region  string `json:"region,omitempty"`
 }
 type OpenshiftReportingDefaultReportDataSourcesConfig struct {
-	Base            *OpenshiftReportingDefaultReportDataSourcesBaseConfig `json:"base,omitempty"`
-	PostKubeVersion *OpenshiftReportingPostKubeVersionConfig              `json:"postKube_1_14,omitempty"`
+	PrometheusDataSource *OpenshiftReportingPrometheusDataSourceConfig         `json:"usePrometheusDataSources,omitempty"`
+	Base                 *OpenshiftReportingDefaultReportDataSourcesBaseConfig `json:"base,omitempty"`
+	PostKubeVersion      *OpenshiftReportingPostKubeVersionConfig              `json:"postKube_1_14,omitempty"`
 }
 type OpenshiftReportingPostKubeVersionConfig struct {
 	Enabled *bool `json:"enabled,omitempty"`
@@ -322,6 +323,10 @@ type OpenshiftReportingReportQueryConfigSpec struct {
 }
 type OpenshiftReportingReportQueryView struct {
 	QueryName string `json:"queryName,omitempty"`
+}
+type OpenshiftReportingPrometheusDataSourceConfig struct {
+	Enabled bool                                  `json:"enabled,omitempty"`
+	Items   []OpenshiftReportingReportQueryConfig `json:"items,omitempty"`
 }
 
 type MeteringConfigTLSConfig struct {

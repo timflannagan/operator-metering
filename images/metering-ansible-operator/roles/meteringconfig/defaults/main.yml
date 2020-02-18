@@ -593,6 +593,8 @@ _meteringconfig_tls_overrides: "{{ meteringconfig_tls_enabled | ternary(_tls_ove
 
 # openshift-reporting overrides
 meteringconfig_reporting_enable_post_kube_1_14_datasources: "{{ _openshift_reporting_default_spec.defaultReportDataSources.postKube_1_14.enabled }}"
+meteringconfig_reporting_use_default_datasources: "{{ _openshift_reporting_default_spec.defaultReportDataSources.enabled | default(true) }}"
+meteringconfig_reporting_use_prometheus_datasources: "{{ _openshift_reporting_default_spec.defaultReportDataSources.usePrometheusDataSources.enabled | default(false) }}"
 
 meteringconfig_reporting_overrides:
   openshift-reporting:

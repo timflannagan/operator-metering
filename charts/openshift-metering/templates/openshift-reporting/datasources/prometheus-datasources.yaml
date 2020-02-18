@@ -1,0 +1,9 @@
+{{- $reportingValues :=  index .Values "openshift-reporting" -}}
+
+{{- if $reportingValues.spec.defaultReportDataSources.usePrometheusDataSources.enabled }}
+# base reportDataSources
+{{- range $_, $body := $reportingValues.spec.defaultReportDataSources.usePrometheusDataSources.items }}
+---
+{{- include "new-report-datasource" $body -}}
+{{- end }}{{/* end range */}}
+{{- end }}{{/* end if */}}

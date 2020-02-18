@@ -492,12 +492,13 @@ func (op *Reporting) handleLinkExistingTable(logger log.FieldLogger, dataSource 
 	}
 
 	var (
-		createView bool
-		tableQuery string
+		createView  bool
+		createTable bool
+		tableQuery  string
 	)
 	// attempt to create an unmanaged PrestoTable CR as we're linking an existing table in Presto to
 	// this particular ReportDataSource and don't need the reporting-operator to create this table for us.
-	prestoTable, err := op.createPrestoTableCR(dataSource, metering.ReportDataSourceGVK, catalog, schema, tableName, cols, unmanagedTable, createView, tableQuery)
+	prestoTable, err := op.createPrestoTableCR(dataSource, metering.ReportDataSourceGVK, catalog, schema, tableName, cols, unmanagedTable, createView, createTable, tableQuery)
 	if err != nil {
 		return fmt.Errorf("failed to create the PrestoTable for the %s ReportDataSource: %v", dataSource.Name, err)
 	}
@@ -615,7 +616,7 @@ func (op *Reporting) handleReportQueryViewDataSource(logger log.FieldLogger, dat
 
 		columns := reportingutil.GeneratePrestoColumns(query)
 		logger.Infof("creating view %s", viewName)
-		prestoTable, err := op.createPrestoTableCR(dataSource, metering.ReportDataSourceGVK, "hive", hiveStorage.Status.Hive.DatabaseName, viewName, columns, false, true, renderedQuery)
+		prestoTable, err := op.createPrestoTableCR(dataSource, metering.ReportDataSourceGVK, "hive", hiveStorage.Status.Hive.DatabaseName, viewName, columns, false, true, false, renderedQuery)
 		if err != nil {
 			return fmt.Errorf("error creating view %s for ReportDataSource %s: %v", viewName, dataSource.Name, err)
 		}

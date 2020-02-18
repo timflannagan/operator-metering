@@ -42,6 +42,7 @@ type PrestoTableSpec struct {
 	View bool `json:"view,omitempty"`
 	// If true, uses "query" to create a table using CREATE TABLE AS.
 	CreateTableAs bool   `json:"createTableAs,omitempty"`
+	CreateTable   bool   `json:"createTable,omitempty"`
 	Query         string `json:"query,omitempty"`
 }
 
