@@ -1,7 +1,7 @@
 ---
 
-- name: Validate Configurations
-  include_tasks: validate.yml
+# - name: Validate Configurations
+#   include_tasks: validate.yml
 
 - name: Configure Networking
   include_tasks: configure_networking.yml
@@ -15,15 +15,19 @@
 - name: Configure Reporting
   include_tasks: configure_reporting.yml
 
+- name: Dump out the meteringconfig_spec parts we care about
+  debug:
+    var: meteringconfig_spec | json_query('networking')
+
 - name: Store MeteringConfig spec into values file
   copy: content="{{ meteringconfig_spec }}" dest=/tmp/metering-values.yaml
 
 - include_tasks: "{{ item }}"
   loop:
-    - reconcile_metering.yml
-    - reconcile_monitoring.yml
-    - reconcile_hdfs.yml
-    - reconcile_hive.yml
-    - reconcile_presto.yml
+    # - reconcile_metering.yml
+    # - reconcile_monitoring.yml
+    # - reconcile_hdfs.yml
+    # - reconcile_hive.yml
+    # - reconcile_presto.yml
     - reconcile_reporting_operator.yml
-    - reconcile_reporting.yml
+    # - reconcile_reporting.yml

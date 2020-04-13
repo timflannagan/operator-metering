@@ -7,18 +7,19 @@ unsupportedFeatures:
 disableOCPFeatures: false
 
 useIPV6Networking: false
-useGlobalProxyNetworking: false
 
 networking:
   useGlobalProxyNetworking: false
   proxy:
     config:
       http_proxy:
+        url: ""
         hostname: ""
         port: ""
         username: ""
         password: ""
       https_proxy:
+        url: ""
         hostname: ""
         port: ""
         username: ""

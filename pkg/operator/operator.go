@@ -39,6 +39,11 @@ import (
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/workqueue"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
+	// "github.com/aws/aws-sdk-go/service/s3/s3iface"
+
 	metering "github.com/operator-framework/operator-metering/pkg/apis/metering/v1"
 	"github.com/operator-framework/operator-metering/pkg/db"
 	cbClientset "github.com/operator-framework/operator-metering/pkg/generated/clientset/versioned"
@@ -59,6 +64,9 @@ const (
 	DefaultPrometheusQueryChunkSize                      = 5 * time.Minute  // the default value for how much data we will insert into Presto per Prometheus query.
 	DefaultPrometheusDataSourceMaxQueryRangeDuration     = 10 * time.Minute // how much data we will query from Prometheus at once
 	DefaultPrometheusDataSourceMaxBackfillImportDuration = 2 * time.Hour    // how far we will query for backlogged data.
+
+	DefaultProxyTrustedCABundlePath = "/etc/pki/ca-trust/extracted/pem"
+	DefaultProxyTrustedCABundleFile = "ca-bundle.crt"
 )
 
 type TLSConfig struct {
@@ -130,6 +138,8 @@ type Config struct {
 	PrometheusDataSourceMaxQueryRangeDuration     time.Duration
 	PrometheusDataSourceMaxBackfillImportDuration time.Duration
 	PrometheusDataSourceGlobalImportFromTime      *time.Time
+
+	ProxyTrustedCABundle string
 
 	LeaderLeaseDuration time.Duration
 
@@ -391,6 +401,12 @@ func (op *Reporting) Run(ctx context.Context) error {
 		Handler: promhttp.Handler(),
 	}
 	pprofServer := newPprofServer(op.cfg.PprofListen)
+
+	op.logger.Infof("Here is the value of the op.cfg.ProxyTrustedCABundle: %s", op.cfg.ProxyTrustedCABundle)
+	err := op.newAWSProxyClient()
+	if err != nil {
+		return err
+	}
 
 	// start these servers at the beginning some pprof and metrics are
 	// available before the reporting operator is ready
@@ -735,6 +751,74 @@ func (op *Reporting) newPrometheusConnFromURL(url string) (prom.API, error) {
 		Address:      url,
 		RoundTripper: roundTripper,
 	})
+}
+
+func (op *Reporting) newAWSProxyClient() error {
+	var (
+		proxy                 string
+		setProxyConfiguration bool
+		transport             http.Transport
+	)
+	if op.cfg.ProxyTrustedCABundle != "" {
+		if _, err := os.Stat(op.cfg.ProxyTrustedCABundle); err != nil {
+			return fmt.Errorf("failed to stat the %s path: %v", op.cfg.ProxyTrustedCABundle, err)
+		}
+		caBundle, err := ioutil.ReadFile(op.cfg.ProxyTrustedCABundle)
+		if err != nil {
+			return fmt.Errorf("failed to load the trusted CA bundle: %v", err)
+		}
+		caRoot := x509.NewCertPool()
+		caRoot.AppendCertsFromPEM(caBundle)
+		transport.TLSClientConfig = &tls.Config{
+			RootCAs: caRoot,
+		}
+
+		proxy = os.Getenv("HTTPS_PROXY")
+		if proxy == "" {
+			return fmt.Errorf("something went wrong with the reporting-operator deployment env vars, $HTTPS_PROXY is empty")
+		}
+		setProxyConfiguration = true
+	} else {
+		proxy = os.Getenv("HTTP_PROXY")
+		if proxy != "" {
+			setProxyConfiguration = true
+		}
+	}
+
+	config := &aws.Config{
+		Region: aws.String("us-east-1"),
+	}
+
+	if setProxyConfiguration {
+		proxyURL, err := url.Parse(proxy)
+		if err != nil {
+			return fmt.Errorf("failed to parse proxy url '%s': %v", proxy, err)
+		}
+		transport.Proxy = http.ProxyURL(proxyURL)
+
+		httpClient := &http.Client{
+			Transport: &transport,
+			Timeout:   time.Second * 20,
+		}
+		config.HTTPClient = httpClient
+	}
+
+	session, err := session.NewSession(config)
+	if err != nil {
+		return fmt.Errorf("failed to create a new aws session: %v", err)
+	}
+	svc := s3.New(session)
+
+	op.logger.Infof("Attempting to get the pruan-qe-tflannag bucket location")
+	result, err := svc.GetBucketLocation(&s3.GetBucketLocationInput{
+		Bucket: aws.String("pruan-qe-tflannag"),
+	})
+	if err != nil {
+		return err
+	}
+	op.logger.Infof("Here is the bucket result: %+v", result)
+
+	return nil
 }
 
 func (op *Reporting) startWorkers(wg *sync.WaitGroup, ctx context.Context) {
