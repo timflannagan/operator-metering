@@ -13,7 +13,6 @@ require (
 	github.com/go-chi/chi v3.3.2+incompatible
 	github.com/gogo/protobuf v1.3.1 // indirect
 	github.com/golang/mock v1.4.3
-	github.com/google/gofuzz v1.1.0 // indirect
 	github.com/gophercloud/gophercloud v0.3.0 // indirect
 	github.com/huandu/xstrings v1.3.0 // indirect
 	github.com/openshift/client-go v0.0.0-20200116152001-92a2713fa240
@@ -26,31 +25,33 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.4.0
 	github.com/taozle/go-hive-driver v0.0.0-20181206100408-79951111cb07
-	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e // indirect
+	golang.org/x/net v0.0.0-20200602114024-627f9648deb9 // indirect
 	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 )
 
 require (
 	github.com/emicklei/go-restful v2.12.0+incompatible // indirect
 	github.com/go-openapi/jsonreference v0.19.3 // indirect
-	github.com/go-openapi/spec v0.19.7 // indirect
-	github.com/go-openapi/swag v0.19.8 // indirect
-	github.com/json-iterator/go v1.1.9 // indirect
+	github.com/go-openapi/spec v0.19.8 // indirect
+	github.com/go-openapi/swag v0.19.9 // indirect
+	github.com/json-iterator/go v1.1.10 // indirect
 	github.com/mailru/easyjson v0.7.1 // indirect
-	github.com/onsi/gomega v1.9.0 // indirect
+	github.com/maxbrunsfeld/counterfeiter/v6 v6.2.3 // indirect
 	github.com/operator-framework/operator-lifecycle-manager v0.0.0-20191115003340-16619cd27fa5
 	github.com/prometheus/procfs v0.0.0-20190104112138-b1a0a9a36d74 // indirect
-	golang.org/x/tools v0.0.0-20200331202046-9d5940d49312 // indirect
+	golang.org/x/mod v0.3.0 // indirect
+	golang.org/x/tools v0.0.0-20200616133436-c1934b75d054 // indirect
 	gonum.org/v1/gonum v0.7.0 // indirect
+	gopkg.in/yaml.v2 v2.3.0 // indirect
 	k8s.io/api v0.18.0
-	k8s.io/apiextensions-apiserver v0.0.0
+	k8s.io/apiextensions-apiserver v0.18.3
 	k8s.io/apimachinery v0.18.0
 	k8s.io/client-go v8.0.0+incompatible
-	k8s.io/code-generator v0.18.0
-	k8s.io/gengo v0.0.0-20200205140755-e0e292d8aa12 // indirect
+	k8s.io/code-generator v0.18.3
+	k8s.io/gengo v0.0.0-20200518160137-fb547a11e5e0 // indirect
 	k8s.io/klog v1.0.0
-	k8s.io/kube-openapi v0.0.0-20200204173128-addea2498afe // indirect
-	sigs.k8s.io/yaml v1.2.0 // indirect
+	k8s.io/klog/v2 v2.2.0 // indirect
+	k8s.io/kube-openapi v0.0.0-20200615155156-dffdd1682719 // indirect
 )
 
 replace (
