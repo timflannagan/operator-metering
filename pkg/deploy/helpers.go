@@ -5,9 +5,16 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
+	"github.com/sirupsen/logrus"
+	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	apiextv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/client-go/kubernetes"
 )
 
 // DecodeYAMLManifestToObject is a helper function that takes the path to a manifest file, e.g. the
@@ -181,4 +188,40 @@ func ReadMeteringAnsibleOperatorManifests(manifestDir, platform string) (*Operat
 	}
 
 	return &resources, nil
+}
+
+func CreateRegistryDeployment(namespace string, client kubernetes.Interface) error {
+	var deployment *appsv1.Deployment
+	err := DecodeYAMLManifestToObject("./olm_deploy/manifests/deployment.yaml", &deployment)
+	if err != nil {
+		return fmt.Errorf("failed to decode the YAML deployment manifest: %v", err)
+	}
+
+	_, err = client.AppsV1().Deployments(namespace).Create(deployment)
+	if !apierrors.IsAlreadyExists(err) && err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func CreateRegistryService(namespace string, client kubernetes.Interface, logger logrus.FieldLogger) (string, error) {
+	var service *v1.Service
+	err := DecodeYAMLManifestToObject("./olm_deploy/manifests/service.yaml", &service)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode the YAML service manifest: %v", err)
+	}
+
+	svc, err := client.CoreV1().Services(namespace).Get(service.Name, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		svc, err = client.CoreV1().Services(namespace).Create(service)
+		if err != nil {
+			return "", err
+		}
+	}
+	if svc.Spec.ClusterIP == "" {
+		time.Sleep(1 * time.Second)
+	}
+
+	return svc.Spec.ClusterIP, nil
 }

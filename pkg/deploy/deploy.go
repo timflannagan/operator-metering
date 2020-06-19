@@ -47,6 +47,8 @@ const (
 	meteringRoleFile               = "metering-operator-role.yaml"
 	meteringClusterRoleBindingFile = "metering-operator-clusterrolebinding.yaml"
 	meteringClusterRoleFile        = "metering-operator-clusterrole.yaml"
+
+	registryServicePort = 50051
 )
 
 // CRD is a structure that holds the information needed to install
@@ -65,6 +67,7 @@ type CRD struct {
 type Config struct {
 	SkipMeteringDeployment   bool
 	RunMeteringOperatorLocal bool
+	CreateCatalogSource      bool
 	DeleteCRDs               bool
 	DeleteCRB                bool
 	DeleteNamespace          bool
@@ -75,6 +78,10 @@ type Config struct {
 	Repo                     string
 	Tag                      string
 	Channel                  string
+	CatalogSourceName        string
+	CatalogSourceNamespace   string
+	CatalogSourceImage       string
+	CatalogSourceAddress     string
 	SubscriptionName         string
 	ExtraNamespaceLabels     map[string]string
 	OperatorResources        *OperatorResources
@@ -155,6 +162,11 @@ func (deploy *Deployer) InstallOLM() error {
 	err := deploy.installNamespace()
 	if err != nil {
 		return fmt.Errorf("failed to create the %s namespace: %v", deploy.config.Namespace, err)
+	}
+
+	err = deploy.installCatalogSource()
+	if err != nil {
+		return fmt.Errorf("failed to create the registry catalogsource in the %s namespace: %v", deploy.config.Namespace, err)
 	}
 
 	err = deploy.installMeteringOperatorGroup()
@@ -241,6 +253,16 @@ func (deploy *Deployer) UninstallOLM() error {
 			return fmt.Errorf("failed to uninstall the %s metering namespace: %v", deploy.config.Namespace, err)
 		}
 	}
+	if deploy.config.DeletePVCs {
+		err = deploy.uninstallMeteringPVCs()
+		if err != nil {
+			return fmt.Errorf("failed to uninstall the metering-related PVCs: %v", err)
+		}
+	}
+	// TODO: delete any resources that match the `olm.owner.namespace=openshift-metering` label
+	// TODO: delete any resources `app=reporting-operator,metering.openshift.io/ns-prune=tflannag` label
+	// if deploy.config.DeleteCRB {
+	// }
 
 	return nil
 }

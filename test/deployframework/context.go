@@ -298,7 +298,7 @@ func (ctx *DeployerCtx) Upgrade(packageName, repoVersion string, purgeReports, p
 		return nil, fmt.Errorf("failed to verify the %s ConfigMap was successfully created: %v", packageName, err)
 	}
 
-	err = CreateCatalogSource(ctx.Logger, packageName, ctx.Namespace, packageName, ctx.OLMV1Alpha1Client)
+	err = CreateConfigMapCatalogSource(ctx.Logger, packageName, ctx.Namespace, packageName, ctx.OLMV1Alpha1Client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create the %s CatalogSource: %v", packageName, err)
 	}

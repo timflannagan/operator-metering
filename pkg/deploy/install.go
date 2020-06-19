@@ -155,6 +155,41 @@ func (deploy *Deployer) installMeteringConfig() error {
 	return nil
 }
 
+func (deploy *Deployer) installCatalogSource() error {
+	err := CreateRegistryDeployment(deploy.config.Namespace, deploy.client)
+	if err != nil {
+		return fmt.Errorf("failed to create the registry resources in the %s namespace: %v", deploy.config.Namespace, err)
+	}
+	deploy.logger.Infof("Created the registry deployment in the %s namespace", deploy.config.Namespace)
+
+	addr, err := CreateRegistryService(deploy.config.Namespace, deploy.client, deploy.logger)
+	if err != nil {
+		return fmt.Errorf("failed to create the registry service in the %s namespace: %v", deploy.config.Namespace, err)
+	}
+	deploy.logger.Infof("Created the registry service in the %s namespace", deploy.config.Namespace)
+
+	deploy.config.CatalogSourceName = fmt.Sprintf("%s-catalogsource-registry", deploy.config.Namespace)
+	deploy.config.CatalogSourceNamespace = deploy.config.Namespace
+
+	catsrc := &olmv1alpha1.CatalogSource{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      deploy.config.CatalogSourceName,
+			Namespace: deploy.config.CatalogSourceNamespace,
+		},
+		Spec: olmv1alpha1.CatalogSourceSpec{
+			SourceType: olmv1alpha1.SourceTypeGrpc,
+			Address:    fmt.Sprintf("%s:%d", addr, registryServicePort),
+		},
+	}
+	_, err = deploy.olmV1Alpha1Client.CatalogSources(deploy.config.Namespace).Create(catsrc)
+	if !apierrors.IsAlreadyExists(err) && err != nil {
+		return fmt.Errorf("failed to create the registry catalogsource in the %s namespace: %v", deploy.config.Namespace, err)
+	}
+	deploy.logger.Infof("Create the registry CatalogSource in the %s namespace", deploy.config.Namespace)
+
+	return nil
+}
+
 func (deploy *Deployer) installMeteringOperatorGroup() error {
 	opgrp, err := deploy.olmV1Client.OperatorGroups(deploy.config.Namespace).Get(deploy.config.Namespace, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
@@ -185,16 +220,26 @@ func (deploy *Deployer) installMeteringOperatorGroup() error {
 }
 
 func (deploy *Deployer) installMeteringSubscription() error {
-	_, err := deploy.olmV1Alpha1Client.Subscriptions(deploy.config.Namespace).Get(deploy.config.SubscriptionName, metav1.GetOptions{})
+	// check if the deploy.config.CatalogSourceName exists before creating the Subscription object
+	_, err := deploy.olmV1Alpha1Client.CatalogSources(deploy.config.CatalogSourceNamespace).Get(deploy.config.CatalogSourceName, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		deploy.logger.Fatalf("The %s CatalogSource in the %s namespace does not exist", deploy.config.CatalogSourceName, deploy.config.CatalogSourceNamespace)
+		return err
+	}
+
+	_, err = deploy.olmV1Alpha1Client.Subscriptions(deploy.config.Namespace).Get(deploy.config.SubscriptionName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		sub := &olmv1alpha1.Subscription{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      deploy.config.SubscriptionName,
 				Namespace: deploy.config.Namespace,
+				Labels: map[string]string{
+					"metering-olm-install": deploy.config.Namespace,
+				},
 			},
 			Spec: &olmv1alpha1.SubscriptionSpec{
-				CatalogSource:          catalogSourceName,
-				CatalogSourceNamespace: catalogSourceNamespace,
+				CatalogSource:          deploy.config.CatalogSourceName,
+				CatalogSourceNamespace: deploy.config.CatalogSourceNamespace,
 				Package:                packageName,
 				Channel:                deploy.config.Channel,
 				InstallPlanApproval:    olmv1alpha1.ApprovalAutomatic,

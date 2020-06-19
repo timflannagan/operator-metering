@@ -287,7 +287,7 @@ func cleanupLocalCmds(logger logrus.FieldLogger, commands ...exec.Cmd) error {
 	return nil
 }
 
-func CreateCatalogSource(logger logrus.FieldLogger, name, namespace, configMapName string, client olmclientv1alpha1.OperatorsV1alpha1Interface) error {
+func CreateConfigMapCatalogSource(logger logrus.FieldLogger, name, namespace, configMapName string, client olmclientv1alpha1.OperatorsV1alpha1Interface) error {
 	// check if the @name CatalogSource already exists and if true, exit early.
 	// If no CatalogSource exists by that name, start building up that object
 	// and attempt to create it through the OLM v1alpha1 client.

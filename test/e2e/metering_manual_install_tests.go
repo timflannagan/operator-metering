@@ -15,6 +15,15 @@ import (
 	"github.com/kube-reporting/metering-operator/test/testhelpers"
 )
 
+// InstallHandlerFunc is a handler function
+func InstallHandlerFunc(f func() error) func() error {
+	// Create a Registry Service object
+	// Get the ClusterIP of the Service object
+	// Create a CatalogSource pointed at that ClusterIP address
+
+	return f
+}
+
 func testManualMeteringInstall(
 	t *testing.T,
 	testCaseName,
@@ -58,8 +67,9 @@ func testManualMeteringInstall(
 	)
 	require.NoError(t, err, "creating a new deployer context should produce no error")
 
+	// TODO: create wrapper function the deployer.InstallOLM method
 	deployerCtx.Logger.Infof("DeployerCtx: %+v", deployerCtx)
-	rf, err := deployerCtx.Setup(deployerCtx.Deployer.Install, expectInstallErr)
+	rf, err := deployerCtx.Setup(deployerCtx.Deployer.InstallOLM, expectInstallErr)
 
 	canSafelyRunTest := testhelpers.AssertCanSafelyRunReportingTests(t, err, expectInstallErr, expectInstallErrMsg)
 	if canSafelyRunTest {
