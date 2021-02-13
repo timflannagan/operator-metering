@@ -15,10 +15,16 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
-func (df *DeployFramework) CreateCatalogSourceFromIndex(indexImage string) (string, string, error) {
+func (df *DeployFramework) CreateCatalogSourceFromIndex(indexImage, marketplaceNamespace string) (string, string, error) {
 	catalogSourceName := df.NamespacePrefix + "-" + DefaultCatalogSourceName
+	namespaceLabel := df.NamespacePrefix + "-" + testNamespaceLabel
 
-	catalogSource, err := df.OLMV1Alpha1Client.CatalogSources(registryDeployNamespace).Get(context.TODO(), catalogSourceName, metav1.GetOptions{})
+	ns, err := CreateTestingNamespace(df.Client, marketplaceNamespace, namespaceLabel)
+	if err != nil {
+		return "", "", err
+	}
+
+	catalogSource, err := df.OLMV1Alpha1Client.CatalogSources(ns.Name).Get(context.TODO(), catalogSourceName, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return "", "", err
 	}
@@ -26,9 +32,9 @@ func (df *DeployFramework) CreateCatalogSourceFromIndex(indexImage string) (stri
 		catsrc := &olmv1alpha1.CatalogSource{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      catalogSourceName,
-				Namespace: registryDeployNamespace,
+				Namespace: ns.Name,
 				Labels: map[string]string{
-					"name": df.NamespacePrefix + "-" + testNamespaceLabel,
+					"name": namespaceLabel,
 				},
 			},
 			Spec: olmv1alpha1.CatalogSourceSpec{
@@ -39,11 +45,11 @@ func (df *DeployFramework) CreateCatalogSourceFromIndex(indexImage string) (stri
 			},
 		}
 
-		catalogSource, err = df.OLMV1Alpha1Client.CatalogSources(registryDeployNamespace).Create(context.TODO(), catsrc, metav1.CreateOptions{})
+		catalogSource, err = df.OLMV1Alpha1Client.CatalogSources(ns.Name).Create(context.TODO(), catsrc, metav1.CreateOptions{})
 		if err != nil {
 			return "", "", err
 		}
-		df.Logger.Infof("Created the metering CatalogSource using the %s index image in the %s namespace", indexImage, registryDeployNamespace)
+		df.Logger.Infof("Created the metering CatalogSource using the %s index image in the %s namespace", indexImage, ns.Name)
 	}
 
 	if catalogSource.ObjectMeta.Name == "" || catalogSource.ObjectMeta.Namespace == "" {
@@ -56,29 +62,29 @@ func (df *DeployFramework) CreateCatalogSourceFromIndex(indexImage string) (stri
 // CreateRegistryResources is a deployframework method responsible
 // for instantiating a new CatalogSource that can be used
 // throughout individual Metering installations.
-func (df *DeployFramework) CreateRegistryResources(registryImage, meteringOperatorImage, reportingOperatorImage string) (string, string, error) {
+func (df *DeployFramework) CreateRegistryResources(registryImage, marketplaceNamespace, meteringOperatorImage, reportingOperatorImage string) (string, string, error) {
 	// Create the registry Service object responsible for exposing the 50051 grpc port.
 	// We're interested in the spec.ClusterIP for this object as we need that value to
 	// use in the `spec.addr` field of the CatalogSource we're creating later.
 	serviceManifestPath := filepath.Join(df.RepoDir, olmManifestsDir, registryServiceManifestName)
-	addr, err := CreateRegistryService(df.Logger, df.Client, df.NamespacePrefix, serviceManifestPath, registryDeployNamespace)
+	addr, err := CreateRegistryService(df.Logger, df.Client, df.NamespacePrefix, serviceManifestPath, marketplaceNamespace)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to create the registry service manifest in the %s namespace: %v", err, registryDeployNamespace)
+		return "", "", fmt.Errorf("failed to create the registry service manifest in the %s namespace: %v", err, marketplaceNamespace)
 	}
 	if addr == "" {
 		return "", "", fmt.Errorf("the registry service spec.ClusterIP returned is empty")
 	}
 
 	deploymentManifestPath := filepath.Join(df.RepoDir, olmManifestsDir, registryDeploymentManifestName)
-	err = CreateRegistryDeployment(df.Logger, df.Client, df.NamespacePrefix, deploymentManifestPath, registryImage, meteringOperatorImage, reportingOperatorImage, registryDeployNamespace)
+	err = CreateRegistryDeployment(df.Logger, df.Client, df.NamespacePrefix, deploymentManifestPath, registryImage, meteringOperatorImage, reportingOperatorImage, marketplaceNamespace)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to create the registry deployment manifest in the %s namespace: %v", err, registryDeployNamespace)
+		return "", "", fmt.Errorf("failed to create the registry deployment manifest in the %s namespace: %v", err, marketplaceNamespace)
 	}
 
 	var catalogSource *olmv1alpha1.CatalogSource
 	catalogSourceName := df.NamespacePrefix + "-" + DefaultCatalogSourceName
 
-	catalogSource, err = df.OLMV1Alpha1Client.CatalogSources(registryDeployNamespace).Get(context.TODO(), catalogSourceName, metav1.GetOptions{})
+	catalogSource, err = df.OLMV1Alpha1Client.CatalogSources(marketplaceNamespace).Get(context.TODO(), catalogSourceName, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return "", "", err
 	}
@@ -86,7 +92,7 @@ func (df *DeployFramework) CreateRegistryResources(registryImage, meteringOperat
 		catsrc := &olmv1alpha1.CatalogSource{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      catalogSourceName,
-				Namespace: registryDeployNamespace,
+				Namespace: marketplaceNamespace,
 				Labels: map[string]string{
 					"name": df.NamespacePrefix + "-" + testNamespaceLabel,
 				},
@@ -99,11 +105,11 @@ func (df *DeployFramework) CreateRegistryResources(registryImage, meteringOperat
 			},
 		}
 
-		catalogSource, err = df.OLMV1Alpha1Client.CatalogSources(registryDeployNamespace).Create(context.TODO(), catsrc, metav1.CreateOptions{})
+		catalogSource, err = df.OLMV1Alpha1Client.CatalogSources(marketplaceNamespace).Create(context.TODO(), catsrc, metav1.CreateOptions{})
 		if err != nil {
 			return "", "", err
 		}
-		df.Logger.Infof("Created the metering CatalogSource using the %s registry image in the %s namespace", registryImage, registryDeployNamespace)
+		df.Logger.Infof("Created the metering CatalogSource using the %s registry image in the %s namespace", registryImage, marketplaceNamespace)
 	}
 
 	if catalogSource.ObjectMeta.Name == "" || catalogSource.ObjectMeta.Namespace == "" {

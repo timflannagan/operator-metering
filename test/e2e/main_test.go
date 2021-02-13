@@ -23,10 +23,11 @@ import (
 var (
 	df *deployframework.DeployFramework
 
-	kubeConfig    string
-	logLevel      string
-	runTestsLocal bool
-	runDevSetup   bool
+	kubeConfig            string
+	logLevel              string
+	runTestsLocal         bool
+	runDevSetup           bool
+	generateTestNamespace bool
 
 	meteringOperatorImageRepo  string
 	meteringOperatorImageTag   string
@@ -45,6 +46,8 @@ var (
 	upgradeFromSubscriptionChannel string
 	catalogSourceName              string
 	catalogSourceNamespace         string
+	marketplaceNamespace           string
+	namespaceLabel                 string
 
 	kubeNamespaceCharLimit   = 63
 	namespacePrefixCharLimit = 10
@@ -93,6 +96,7 @@ func testMainWrapper(m *testing.M) int {
 	flag.BoolVar(&runTestsLocal, "run-tests-local", false, "Controls whether the metering and reporting operators are run locally during tests")
 	flag.BoolVar(&runDevSetup, "run-dev-setup", false, "Controls whether the e2e suite uses the dev-friendly configuration")
 	flag.BoolVar(&runAWSBillingTests, "run-aws-billing-tests", runAWSBillingTests, "")
+	flag.BoolVar(&generateTestNamespace, "generate-test-namespaces", true, "Controls whether the e2e suite generates testing namespaces prefixed with the --namespace-prefix flag")
 
 	flag.StringVar(&meteringOperatorImageRepo, "metering-operator-image-repo", meteringOperatorImageRepo, "")
 	flag.StringVar(&meteringOperatorImageTag, "metering-operator-image-tag", meteringOperatorImageTag, "")
@@ -108,6 +112,7 @@ func testMainWrapper(m *testing.M) int {
 	flag.StringVar(&indexImage, "index-image", "", "The name of the index image containing a metering bundle. Note: this flag take precedence over the --registry-image flag.")
 	flag.StringVar(&subscriptionChannel, "subscription-channel", "4.6", "The name of an existing channel in the registry image you want to subscribe to.")
 	flag.StringVar(&upgradeFromSubscriptionChannel, "upgrade-from-subscription-channel", "4.6", "The name of an existing channel in a catalog source that you want to upgrade from.")
+	flag.StringVar(&marketplaceNamespace, "marketplace-namespace", "openshift-marketplace", "The namespace that contains the OLM marketplace resources.")
 	flag.Parse()
 
 	logger := testhelpers.SetupLogger(logLevel)
@@ -124,12 +129,13 @@ func testMainWrapper(m *testing.M) int {
 	if indexImage == "" {
 		logger.Fatalf("You need to specify a non-empty --index-image flag value")
 	}
+	namespaceLabel = fmt.Sprintf("%s-%s", namespacePrefix, testingNamespaceLabel)
 
 	// TODO: determine whether it makes sense to have a toggle for creating
 	// either a registry containing the old packagemanifest format vs.
 	// always using an index image. For now, always use the index image.
 	var registryProvisioned bool
-	catalogSourceName, catalogSourceNamespace, err = df.CreateCatalogSourceFromIndex(indexImage)
+	catalogSourceName, catalogSourceNamespace, err = df.CreateCatalogSourceFromIndex(indexImage, marketplaceNamespace)
 	if err != nil {
 		df.Logger.Errorf("Failed to create the CatalogSource custom resource using the %s index image: %v", indexImage, err)
 		return 1
@@ -177,7 +183,7 @@ type PreInstallFunc func(ctx *deployframework.DeployerCtx) error
 
 func TestInvalidMeteringConfigs(t *testing.T) {
 	namespace := fmt.Sprintf("%s-invalid-meteringconfigs", namespacePrefix)
-	ns, err := createTestingNamespace(df.Client, namespace)
+	ns, err := deployframework.CreateTestingNamespace(df.Client, namespace, namespaceLabel)
 	require.NoError(t, err, "failed to successfully create the %s testing namespace", namespace)
 	require.NotEmpty(t, ns.Name, "expected the testing namespace would not be nil")
 
@@ -268,6 +274,38 @@ func TestManualMeteringInstall(t *testing.T) {
 				},
 			},
 			MeteringConfigManifestFilename: "node-selector-prometheus-importer-disabled.yaml",
+		},
+		{
+			Name:                      "kind",
+			MeteringOperatorImageRepo: meteringOperatorImageRepo,
+			MeteringOperatorImageTag:  meteringOperatorImageTag,
+			PreInstallFunc: func(ctx *deployframework.DeployerCtx) error {
+				// Need to account for the CatalogSource Pod
+				ctx.TargetPodsCount = 9
+				return nil
+			},
+			InstallSubTests: []InstallTestCase{
+				{
+					Name:     "testReportingProducesData",
+					TestFunc: testReportingProducesData,
+					ExtraEnvVars: []string{
+						"REPORTING_OPERATOR_PROMETHEUS_DATASOURCE_MAX_IMPORT_BACKFILL_DURATION=15m",
+						"REPORTING_OPERATOR_PROMETHEUS_METRICS_IMPORTER_INTERVAL=30s",
+						"REPORTING_OPERATOR_PROMETHEUS_METRICS_IMPORTER_CHUNK_SIZE=5m",
+						"REPORTING_OPERATOR_PROMETHEUS_METRICS_IMPORTER_INTERVAL=5m",
+						"REPORTING_OPERATOR_PROMETHEUS_METRICS_IMPORTER_STEP_SIZE=60s",
+					},
+				},
+				{
+					Name:     "testFailedPrometheusQueryEvents",
+					TestFunc: testFailedPrometheusQueryEvents,
+				},
+				{
+					Name:     "testEnsurePostgresParametersAreMissing",
+					TestFunc: testEnsurePostgresParametersAreMissing,
+				},
+			},
+			MeteringConfigManifestFilename: "kind.yaml",
 		},
 		{
 			Name:                      "HDFS-MYSQL-ReportDynamicInputData",
@@ -411,6 +449,14 @@ func TestManualMeteringInstall(t *testing.T) {
 			continue
 		}
 
+		testFuncNamespace := namespacePrefix
+		if generateTestNamespace {
+			testFuncNamespace := fmt.Sprintf("%s-%s", namespacePrefix, strings.ToLower(testCase.Name))
+			if len(testFuncNamespace) > kubeNamespaceCharLimit {
+				require.Fail(t, "The length of the test function namespace exceeded the kube namespace limit of %d characters", kubeNamespaceCharLimit)
+			}
+		}
+
 		t.Run(testCase.Name, func(t *testing.T) {
 			// If we call t.Parallel() here, the top-level test will
 			// blocked from returning until all of the goroutines that
@@ -420,7 +466,7 @@ func TestManualMeteringInstall(t *testing.T) {
 			testManualMeteringInstall(
 				t,
 				testCase.Name,
-				namespacePrefix,
+				testFuncNamespace,
 				testCase.MeteringOperatorImageRepo,
 				testCase.MeteringOperatorImageTag,
 				testCase.MeteringConfigManifestFilename,

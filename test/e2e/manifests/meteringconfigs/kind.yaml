@@ -1,0 +1,31 @@
+apiVersion: metering.openshift.io/v1
+kind: MeteringConfig
+metadata:
+  name: metering
+spec:
+  disableOCPFeatures: true
+
+  unsupportedFeatures:
+    enableHDFS: true
+
+  reporting-operator:
+    spec:
+      config:
+        prometheus:
+          url: "http://prometheus-k8s.monitoring.svc:9090"
+
+  storage:
+    type: "hive"
+    hive:
+      type: "hdfs"
+      hdfs:
+        namenode: "hdfs-namenode-0.hdfs-namenode:9820"
+
+  hadoop:
+    spec:
+      hdfs:
+        # Kind uses hostPath for local storage provisioners
+        securityContext:
+          fsGroup: 0
+          runAsNonRoot: false
+          runAsUser: 0

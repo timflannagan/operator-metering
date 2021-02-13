@@ -28,7 +28,10 @@ import (
 	olmclientv1alpha1 "github.com/operator-framework/operator-lifecycle-manager/pkg/api/client/clientset/versioned/typed/operators/v1alpha1"
 )
 
-func checkPodStatus(pod corev1.Pod) (bool, int) {
+func checkPodStatus(pod corev1.Pod) (ready bool, numUnreadyContainers int) {
+	if pod.Status.Phase == corev1.PodSucceeded {
+		return true, 0
+	}
 	if pod.Status.Phase != corev1.PodRunning {
 		return false, 0
 	}
@@ -101,20 +104,6 @@ func validateImageConfig(image metering.ImageConfig) error {
 	return nil
 }
 
-type PodWaiter struct {
-	InitialDelay  time.Duration
-	TimeoutPeriod time.Duration
-	Logger        logrus.FieldLogger
-	Client        kubernetes.Interface
-	OLMClient     olmclientv1alpha1.OperatorsV1alpha1Interface
-}
-
-type podStat struct {
-	PodName string
-	Ready   int
-	Total   int
-}
-
 // ErrInstallPlanFailed represents a failing InstallPlan during an
 // individual metering installation instantiated by OLM.
 var ErrInstallPlanFailed = errors.New("detected failing InstallPlan")
@@ -177,6 +166,20 @@ func handleInstallPlanFailures(client olmclientv1alpha1.OperatorsV1alpha1Interfa
 	logger.Infof("Deleted the failing %s InstallPlan due to object modification", ip.Name)
 
 	return ErrInstallPlanFailed
+}
+
+type PodWaiter struct {
+	InitialDelay  time.Duration
+	TimeoutPeriod time.Duration
+	Logger        logrus.FieldLogger
+	Client        kubernetes.Interface
+	OLMClient     olmclientv1alpha1.OperatorsV1alpha1Interface
+}
+
+type podStat struct {
+	PodName string
+	Ready   int
+	Total   int
 }
 
 // WaitForPods periodically polls the list of pods in the namespace
@@ -903,4 +906,33 @@ func DeleteRegistryDeployment(logger logrus.FieldLogger, client kubernetes.Inter
 	}
 
 	return nil
+}
+
+// CreateTestingNamespace is a helper function that is responsible
+// for creating a namespace with the @namespace metadata.name and
+// contains the `name: "<namespace_prefix>-metering-testing-ns` label.
+// During the teardown function of the hack/e2e.sh script, we search for any
+// namespaces that match that label. Note: manually running the e2e suite
+// specifying a list of go test flags does not ensure proper cleanup.
+func CreateTestingNamespace(client kubernetes.Interface, namespace, label string) (*corev1.Namespace, error) {
+	var ns *corev1.Namespace
+	ns, err := client.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+	if apierrors.IsNotFound(err) {
+		ns = &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: namespace,
+				Labels: map[string]string{
+					"name": label,
+				},
+			},
+		}
+		ns, err = client.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
+		if err != nil {
+			return nil, err
+		}
+	}
+	return ns, nil
 }

@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -18,7 +17,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/kubernetes"
 
 	"github.com/kube-reporting/metering-operator/pkg/deploy"
 	"github.com/kube-reporting/metering-operator/test/deployframework"
@@ -36,7 +34,7 @@ const (
 func testManualMeteringInstall(
 	t *testing.T,
 	testCaseName,
-	namespacePrefix,
+	namespace,
 	meteringOperatorImageRepo,
 	meteringOperatorImageTag,
 	manifestFilename,
@@ -52,11 +50,6 @@ func testManualMeteringInstall(
 	err := os.Mkdir(testCaseOutputBaseDir, 0777)
 	require.NoError(t, err, "creating the test case output directory should produce no error")
 
-	testFuncNamespace := fmt.Sprintf("%s-%s", namespacePrefix, strings.ToLower(testCaseName))
-	if len(testFuncNamespace) > kubeNamespaceCharLimit {
-		require.Fail(t, "The length of the test function namespace exceeded the kube namespace limit of %d characters", kubeNamespaceCharLimit)
-	}
-
 	mc, err := testhelpers.DecodeMeteringConfigManifest(repoPath, testMeteringConfigManifestsPath, manifestFilename)
 	require.NoError(t, err, "failed to successfully decode the YAML MeteringConfig manifest")
 
@@ -68,7 +61,7 @@ func testManualMeteringInstall(
 	}
 
 	deployerCtx, err := df.NewDeployerCtx(
-		testFuncNamespace,
+		namespace,
 		meteringOperatorImageRepo,
 		meteringOperatorImageTag,
 		reportingOperatorImageRepo,
@@ -127,37 +120,8 @@ func testManualMeteringInstall(
 	assert.NoError(t, err, "capturing logs and uninstalling metering should produce no error")
 }
 
-// createTestingNamespace is a helper function that is responsible
-// for creating a namespace with the @namespace metadata.name and
-// contains the `name: "<namespace_prefix>-metering-testing-ns` label.
-// During the teardown function of the hack/e2e.sh script, we search for any
-// namespaces that match that label. Note: manually running the e2e suite
-// specifying a list of go test flags does not ensure proper cleanup.
-func createTestingNamespace(client kubernetes.Interface, namespace string) (*corev1.Namespace, error) {
-	var ns *corev1.Namespace
-	ns, err := client.CoreV1().Namespaces().Get(context.Background(), namespace, metav1.GetOptions{})
-	if err != nil && !apierrors.IsNotFound(err) {
-		return nil, err
-	}
-	if apierrors.IsNotFound(err) {
-		ns = &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: namespace,
-				Labels: map[string]string{
-					"name": namespacePrefix + "-" + testingNamespaceLabel,
-				},
-			},
-		}
-		ns, err = client.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
-		if err != nil {
-			return nil, err
-		}
-	}
-	return ns, nil
-}
-
 func createNFSProvisioner(ctx *deployframework.DeployerCtx) error {
-	_, err := createTestingNamespace(ctx.Client, nfsTestingNamespace)
+	_, err := deployframework.CreateTestingNamespace(ctx.Client, nfsTestingNamespace, namespaceLabel)
 	if err != nil {
 		return err
 	}
@@ -244,7 +208,7 @@ func s3InstallFunc(ctx *deployframework.DeployerCtx) error {
 	// for Pods that will not be created by the metering-ansible-operator
 	ctx.TargetPodsCount = nonHDFSTargetPodCount
 
-	_, err := createTestingNamespace(ctx.Client, ctx.Namespace)
+	_, err := deployframework.CreateTestingNamespace(ctx.Client, ctx.Namespace, namespaceLabel)
 	if err != nil {
 		return err
 	}
@@ -337,7 +301,7 @@ func createMySQLDatabase(ctx *deployframework.DeployerCtx) error {
 		mysqlNamespace     = "mysql"
 		mysqlLabelSelector = "db=mysql"
 	)
-	_, err := createTestingNamespace(ctx.Client, mysqlNamespace)
+	_, err := deployframework.CreateTestingNamespace(ctx.Client, mysqlNamespace, namespaceLabel)
 	if err != nil {
 		return err
 	}

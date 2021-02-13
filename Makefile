@@ -129,6 +129,9 @@ unit-docker: metering-src-docker-build
 		$(METERING_SRC_IMAGE_REPO):$(METERING_SRC_IMAGE_TAG) \
 		make unit
 
+e2e-kind: $(DEPLOY_METERING_BIN_OUT)
+	hack/kind.sh
+
 e2e: $(DEPLOY_METERING_BIN_OUT)
 	hack/e2e.sh
 
